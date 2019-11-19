@@ -3,7 +3,7 @@ import { useMachine } from '@xstate/react';
 import gameMachine from './machines/gameMachine';
 
 const Game = () => {
-  const [current, send] = useMachine(gameMachine);
+  const [current, send] = useMachine(gameMachine.withContext({ ...gameMachine.context, timer: 120 }));
   const { context } = current;
   return (
     <div>
