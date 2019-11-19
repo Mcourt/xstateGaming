@@ -1,4 +1,45 @@
-import { Machine, assign, send } from 'xstate';
+import { Machine, assign, send, sendParent } from 'xstate';
+
+const inGameStates = {
+  initial: 'playing',
+  states: {
+    playing: {
+      invoke: {
+        id: 'incInterval',
+        src: (context, event) => (callback, onEvent) => {
+          // This will send the 'INC' event to the parent every second
+          const id = setInterval(() => callback({ type: 'TIMER.UPDATE', value: -1 }), 1000);
+
+          // Perform cleanup
+          return () => clearInterval(id);
+        }
+      },
+      on: {
+        'GAME.PAUSE': 'paused',
+        'TIMER.UPDATE': {
+          actions: [
+            'updateTimer',
+            sendParent('GAME.END')
+          ]
+        },
+        'SCORE.UPDATE': {
+          actions: ['updateScore']
+        },
+      }
+    },
+    paused: {
+      on: {
+        'GAME.RESUME': {
+          target: 'playing',
+        },
+        'GAME.RETRY': {
+          target: 'playing',
+          actions: ['resetGame']
+        }
+      },
+    },
+  }
+};
 
 const gameMachine = Machine({
   id: "game",
@@ -9,60 +50,42 @@ const gameMachine = Machine({
   },
   states: {
     mainMenu: {
-      on: { 'GAME.NEW': 'playing' },
+      on: { 'GAME.NEW': 'inGame' },
     },
-    playing: {
-      invoke: {
-        id: 'incInterval',
-        src: (context, event) => (callback, onEvent) => {
-          // This will send the 'INC' event to the parent every second
-          const id = setInterval(() => callback('TIMER.DEC'), 1000);
-
-          // Perform cleanup
-          return () => clearInterval(id);
-        }
-      },
+    inGame: {
       on: {
         'GAME.END': { target: "endGame", cond: ctx => ctx.timer === 0 },
-        'GAME.PAUSE': 'paused',
-        'TIMER.DEC': {
-          actions: [
-            assign({
-              timer: (ctx, event) => {
-                const newTimer = ctx.timer - 1;
-                return newTimer > 0 ? newTimer : 0;
-              }
-            }),
-            send('GAME.END')
-          ]
-        },
-        'SCORE.ADD': {
-          actions: assign({
-            score: (ctx, event) => {
-              const newScore = ctx.score + event.value;
-              return newScore > 0 ? newScore : 0;
-            }
-          })
-        },
       },
-    },
-    paused: {
-      on: {
-        'GAME.RESUME': {
-          target: 'playing',
-        },
-        'GAME.RETRY': {
-          target: 'playing',
-          actions: assign({
-            score: 0,
-            timer: (context, event) => 120,
-          })
-        }
-      },
+      ...inGameStates,
     },
     endGame: {
-      on: { 'GAME.RETRY': 'playing' },
+      on: {
+        'GAME.RETRY': {
+          target: 'inGame',
+          actions: ['resetGame']
+        },
+      },
     },
+  }
+},
+{
+  actions: {
+    resetGame: assign({
+      score: () => gameMachine.initialState.context.score,
+      timer: () => gameMachine.initialState.context.timer,
+    }),
+    updateScore: assign({
+      score: (ctx, event) => {
+        const newScore = ctx.score + event.value;
+        return newScore > 0 ? newScore : 0;
+      }
+    }),
+    updateTimer: assign({
+      timer: (ctx, { value }) => {
+        const newTimer = ctx.timer + value;
+        return newTimer > 0 ? newTimer : 0;
+      }
+    })
   }
 });
 
