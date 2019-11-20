@@ -2,48 +2,26 @@ import React from 'react';
 import { useMachine } from '@xstate/react';
 import gameMachine from './machines/gameMachine';
 
+import levels from './levels';
+
+import MainMenu from './MainMenu';
+import Level from './Level';
+
+
 const Game = () => {
-  const [current, send] = useMachine(gameMachine.withContext({ ...gameMachine.context, timer: 120 }));
+  const [current, send] = useMachine(gameMachine.withContext({ levels }));
+
   const { context } = current;
+
   return (
     <div>
-      <h1>Current state = {JSON.stringify(current.value)}</h1>
-      <div>
-        <h2>State controller</h2>
         {current.matches('mainMenu') && (
-          <>
-            <button onClick={() => send("GAME.NEW")}>New Game</button>
-          </>
+          <MainMenu menuRef={context.mainMenu} otherProp="couocu" />
         )}
+
         {current.matches('inGame') && (
-          <>
-            <div>
-              <p>Timer : {context.timer} </p>
-              <p>Score : {context.score}</p>
-            </div>
-            {current.matches('inGame.playing') && (
-              <>
-                <button onClick={() => send("GAME.PAUSE")}>Pause Game</button>
-                <button onClick={() => send({type: "SCORE.UPDATE", value: 1})}>Add Score</button>
-                <button onClick={() => send({type: "SCORE.UPDATE", value: -10})}>Remove Score</button>
-                <button onClick={() => send({type: "TIMER.UPDATE", value: 10})}>Add Time</button>
-              </>
-            )}
-            {current.matches('inGame.paused') && (
-              <>
-                <button onClick={() => send("GAME.RETRY")}>Retry</button>
-                <button onClick={() => send("GAME.RESUME")}>Resume Game</button>
-              </>
-            )}
-          </>
+          <Level levelRef={context.currentLevel} />
         )}
-        {current.matches('endGame') && (
-          <div>
-            Final Score : {context.score}
-            <button onClick={() => send("GAME.RETRY")}>Retry</button>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
